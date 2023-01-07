@@ -6,6 +6,9 @@
 #define DATA_PINTS_MASK 0x7F800
 #define ADDRESS_PINS_MASK 0x7FF
 
+#define LADDRESS_PINS_MASK 0xFF
+#define UADDRESS_PINS_MASK 0x700
+
 #define UPPER_ADDRESS 0xFFFFF8FF
 #define LOWER_ADDRESS 0xFFFFFF00
 #define DATA 0xFFF807FF
@@ -34,7 +37,7 @@ void set_lower_addr()
 
 	uint32_t address = atoi(address_str) & 0xFF;
 	
-	gpio_put_masked(LOWER_ADDRESS, address);
+	gpio_put_masked(LADDRESS_PINS_MASK, address);
 }
 
 void set_upper_addr()
@@ -44,7 +47,7 @@ void set_upper_addr()
 
 	uint32_t address = (atoi(address_str) & 0b111) << 8;
 	
-	gpio_put_masked(UPPER_ADDRESS, address);
+	gpio_put_masked(UADDRESS_PINS_MASK, address);
 }
 
 void set_data()
@@ -62,24 +65,28 @@ void flash_data()
 {
 	gpio_set_dir_out_masked(DATA_PINTS_MASK);
 
-	gpio_put(WRITE_ENABLE | CHIP_ENABLE, false);
+	gpio_put(CHIP_ENABLE, false);
+	gpio_put(WRITE_ENABLE, false);
 	sleep_ms(5);
 
-	gpio_put(WRITE_ENABLE | CHIP_ENABLE, true);
+	gpio_put(WRITE_ENABLE, true);
+	gpio_put(CHIP_ENABLE, true);
 }
 
 void read_data() 
 {
 	gpio_set_dir_in_masked(DATA_PINTS_MASK);
 
-	gpio_put(OUTPUT_ENABLE | CHIP_ENABLE, false);
+	gpio_put(CHIP_ENABLE, false);
+	gpio_put(OUTPUT_ENABLE, false);
 	sleep_ms(5);
 
 	int curr_val = (gpio_get_all() & DATA_PINTS_MASK) >> 11;
 	printf("D%i\n", curr_val);
 	sleep_ms(5);
 
-	gpio_put(OUTPUT_ENABLE | CHIP_ENABLE, true);
+	gpio_put(OUTPUT_ENABLE, true);
+	gpio_put(CHIP_ENABLE, true);
 	sleep_ms(5);
 }
 
@@ -91,8 +98,11 @@ void process_command(char c)
 		case 'U': set_upper_addr(); break;
 		case 'D': set_data(); break;
 		case 'F': flash_data(); break;
-		case 'R': read_data(); break;
+		case 'R': read_data(); 	return;
+		default:
+			return;
 	}
+	printf("A\n");
 }
 
 void process_command_loop()

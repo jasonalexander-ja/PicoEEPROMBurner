@@ -3,22 +3,26 @@
 #include "pico/stdlib.h"
 #include <Utils.h>
 
-#define DATA_PINTS_MASK 0x7F800
-#define ADDRESS_PINS_MASK 0x7FF
+// GPIO Pins 15-22 are data pins 0-7 
+#define DATA_PINTS_MASK 0x7F8000
+// GPIO Pins 0-14 are address pins 0-14 
+#define ADDRESS_PINS_MASK 0x7FFF
 
+// Address pins are divided into the lower 8 bits and upper 7 bits 
+// GPIO Pins 0-7 are address pins 0-7 (L for Lower Address) 
 #define LADDRESS_PINS_MASK 0xFF
-#define UADDRESS_PINS_MASK 0x700
+// GPIO Pins 8-14 are address pins 8-14 (U for Upper Address) 
+#define UADDRESS_PINS_MASK 0x7F00
 
-#define UPPER_ADDRESS 0xFFFFF8FF
-#define LOWER_ADDRESS 0xFFFFFF00
-#define DATA 0xFFF807FF
+// Skip pins 23, 24, and 25 as these are pads on the bottom
 
-#define CHIP_ENABLE 19
-#define OUTPUT_ENABLE 20
-#define WRITE_ENABLE 21
+// Pins 26-28 are the control pins for R/W operations to the chip 
+#define CONTROL_BITS_MASK 0x1C000000
+#define CHIP_ENABLE 26
+#define OUTPUT_ENABLE 27
+#define WRITE_ENABLE 28
 
-#define CONTROL_BITS_MASK 0x380000
-
+// Called on setup, sets the GPIO direction and all the control pins high (logical 0) 
 void setup_gpio()
 {
 	stdio_init_all();
@@ -45,7 +49,7 @@ void set_upper_addr()
 	char address_str[3] = {'0', '0', '0'};
 	get_block(address_str, 3);
 
-	uint32_t address = (atoi(address_str) & 0b111) << 8;
+	uint32_t address = (atoi(address_str) & 0x7F) << 8;
 	
 	gpio_put_masked(UADDRESS_PINS_MASK, address);
 }
@@ -55,7 +59,7 @@ void set_data()
 	char data_str[3] = {'0', '0', '0'};
 	get_block(data_str, 3);
 
-	uint32_t data = (atoi(data_str) & 0xFF) << 11;
+	uint32_t data = (atoi(data_str) & 0xFF) << 15;
 
 	gpio_set_dir_out_masked(DATA_PINTS_MASK);
 	gpio_put_masked(DATA_PINTS_MASK, data);
@@ -67,7 +71,7 @@ void flash_data()
 
 	gpio_put(CHIP_ENABLE, false);
 	gpio_put(WRITE_ENABLE, false);
-	sleep_ms(5);
+	sleep_us(50);
 
 	gpio_put(WRITE_ENABLE, true);
 	gpio_put(CHIP_ENABLE, true);
@@ -79,15 +83,15 @@ void read_data()
 
 	gpio_put(CHIP_ENABLE, false);
 	gpio_put(OUTPUT_ENABLE, false);
-	sleep_ms(5);
+	sleep_us(50);
 
-	int curr_val = (gpio_get_all() & DATA_PINTS_MASK) >> 11;
+	int curr_val = (gpio_get_all() & DATA_PINTS_MASK) >> 15;
 	printf("D%i\n", curr_val);
-	sleep_ms(5);
+	sleep_us(50);
 
 	gpio_put(OUTPUT_ENABLE, true);
 	gpio_put(CHIP_ENABLE, true);
-	sleep_ms(5);
+	sleep_us(50);
 }
 
 void process_command(char c)

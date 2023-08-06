@@ -54,15 +54,22 @@ void set_upper_addr()
 	gpio_put_masked(UADDRESS_PINS_MASK, address);
 }
 
-void set_data()
+void set_data(int in_data)
+{
+	uint32_t data = (in_data & 0xFF) << 15;
+
+	gpio_set_dir_out_masked(DATA_PINTS_MASK);
+	gpio_put_masked(DATA_PINTS_MASK, data);
+}
+
+void fetch_set_data()
 {
 	char data_str[3] = {'0', '0', '0'};
 	get_block(data_str, 3);
 
-	uint32_t data = (atoi(data_str) & 0xFF) << 15;
+	uint32_t data = atoi(data_str);
 
-	gpio_set_dir_out_masked(DATA_PINTS_MASK);
-	gpio_put_masked(DATA_PINTS_MASK, data);
+	set_data(data);
 }
 
 void flash_data() 
@@ -71,13 +78,13 @@ void flash_data()
 
 	gpio_put(CHIP_ENABLE, false);
 	gpio_put(WRITE_ENABLE, false);
-	sleep_us(50);
+	sleep_us(150);
 
 	gpio_put(WRITE_ENABLE, true);
 	gpio_put(CHIP_ENABLE, true);
 }
 
-void read_data() 
+uint32_t read_data() 
 {
 	gpio_set_dir_in_masked(DATA_PINTS_MASK);
 
@@ -85,13 +92,37 @@ void read_data()
 	gpio_put(OUTPUT_ENABLE, false);
 	sleep_us(50);
 
-	int curr_val = (gpio_get_all() & DATA_PINTS_MASK) >> 15;
-	printf("D%i\n", curr_val);
+	uint32_t curr_val = (gpio_get_all() & DATA_PINTS_MASK) >> 15;
 	sleep_us(50);
 
 	gpio_put(OUTPUT_ENABLE, true);
 	gpio_put(CHIP_ENABLE, true);
 	sleep_us(50);
+	return curr_val;
+}
+
+void read_data_print()
+{
+	uint32_t curr_val = read_data();
+	printf("D%lu\n", curr_val);
+}
+
+void set_data_flash()
+{
+	char data_str[3] = {'0', '0', '0'};
+	get_block(data_str, 3);
+
+	uint32_t data = atoi(data_str);
+	uint32_t readback_data = read_data();
+
+	while (data != readback_data)
+	{
+		set_data(data);
+		flash_data();
+		sleep_us(400);
+		readback_data = read_data();
+	}
+
 }
 
 void process_command(char c)
@@ -100,9 +131,10 @@ void process_command(char c)
 	{
 		case 'L': set_lower_addr(); break;
 		case 'U': set_upper_addr(); break;
-		case 'D': set_data(); break;
+		case 'D': fetch_set_data(); break;
 		case 'F': flash_data(); break;
-		case 'R': read_data(); 	return;
+		case 'S': set_data_flash(); break;
+		case 'R': read_data_print(); 	return;
 		default:
 			return;
 	}
